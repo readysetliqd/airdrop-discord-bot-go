@@ -22,10 +22,9 @@ func main() {
 	tickerDelay := 10 * time.Second
 	ticker := time.NewTicker(tickerDelay)
 
-	select {
-	case <-ticker.C:
+	for range ticker.C {
 		goBot.ChannelMessageSend(config.DefaultChannelID, "times up!")
-		log.Println("timer fired")
+		log.Println("timer fired to channel ", config.DefaultChannelID)
 		ticker.Reset(tickerDelay)
 	}
 
