@@ -1,1 +1,1 @@
-worker: command_to_run_your_worker
+web: airdrop-discord-bot-go
