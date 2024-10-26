@@ -2,22 +2,13 @@ package main
 
 import (
 	"log"
-
-	"github.com/bwmarrin/discordgo"
-	"github.com/joho/godotenv"
 	"github.com/readysetliqd/airdrop-discord-bot-go/bot"
 	"github.com/readysetliqd/airdrop-discord-bot-go/config"
-	"github.com/readysetliqd/airdrop-discord-bot-go/data"
 )
-
-var s *discordgo.Session
-var protocols *data.Protocols
-var unprocessedMessages *data.UnprocessedMessages
 
 func main() {
 	// load configs, secrets, and backup data into memory
 	loadConfig()
-	loadGoogleSecrets()
 	err := bot.Start()
 	if err != nil {
 		log.Fatal(err)
@@ -34,15 +25,6 @@ func main() {
 	// 	fmt.Println(*emoji)
 	// }
 	//^DEBUG
-}
-
-// loadGoogleSecrets is a helper function that loads the google secrets from
-// the .env file into the os environment. It shuts down program on any errors
-func loadGoogleSecrets() {
-	err := godotenv.Load(data.GoogleSecretsEnvFileName)
-	if err != nil {
-		log.Fatal("error loading .env files |", err)
-	}
 }
 
 // loadConfig loads the config.json file into the config struct to be used by
