@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+
 	"github.com/readysetliqd/airdrop-discord-bot-go/bot"
 	"github.com/readysetliqd/airdrop-discord-bot-go/config"
 )
