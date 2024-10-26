@@ -1,5 +1,14 @@
 {
     "token": "insert_bot_token_here",
     "botPrefix": "!",
+    "guildID": "1234",
     "channelID": "1234"
+    "fundingRoundRoleID": "1234",
+    "earlyRoundRoleID": "1234",
+    "binanceRoundRoleID": "1234",
+    "paradigmRoundRoleID": "1234",
+    "coinbaseRoundRoleID": "1234",
+    "botOperatorRoleID": "1234",
+    "twitterEmojiName": "twitterlogo",
+    "twitterEmojiID": "1234"
 }
