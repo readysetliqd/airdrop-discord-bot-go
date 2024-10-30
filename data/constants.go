@@ -11,6 +11,7 @@ const (
 	ProtocolsFileName           = "protocols.jsonl"
 	UnprocessedMessagesFileName = "unprocessed_messages.jsonl"
 	GoogleSecretsEnvFileName    = "googlesecrets.env"
+	ConfigEnvFileName           = "config.env"
 )
 
 type MessageType int

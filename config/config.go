@@ -2,7 +2,11 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
+
+	"github.com/joho/godotenv"
+	"github.com/readysetliqd/airdrop-discord-bot-go/data"
 )
 
 var (
@@ -22,17 +26,21 @@ var (
 
 // ReadConfig reads the environment variables and assigns them into global exported variables
 func ReadConfig() error {
-	Token = os.Getenv("token")
-	BotPrefix = os.Getenv("botPrefix")
-	DefaultChannelID = os.Getenv("channelID")
-	GuildID = os.Getenv("guildID")
-	FundingRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("fundingRoundRoleID"))
-	EarlyRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("earlyRoundRoleID"))
-	BinanceRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("binanceRoundRoleID"))
-	ParadigmRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("paradigmRoundRoleID"))
-	CoinbaseRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("coinbaseRoundRoleID"))
-	BotOperatorRoleID = os.Getenv("botOperatorRoleID")
-	TwitterEmoji = fmt.Sprintf("%s:%s", os.Getenv("twitterEmojiName"), os.Getenv("twitterEmojiID"))
-	TwitterEmojiName = os.Getenv("twitterEmojiName")
+	err := godotenv.Load(data.ConfigEnvFileName)
+	if err != nil {
+		log.Fatal("error loading .env files |", err)
+	}
+	Token = os.Getenv("TOKEN")
+	BotPrefix = os.Getenv("BOTPREFIX")
+	DefaultChannelID = os.Getenv("GUILDID")
+	GuildID = os.Getenv("CHANNELID")
+	FundingRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("FUNDINGROUNDROLEID"))
+	EarlyRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("EARLYROUNDROLEID"))
+	BinanceRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("BINANCEROUNDROLEID"))
+	ParadigmRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("PARADIGMROUNDROLEID"))
+	CoinbaseRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("COINBASEROUNDROLEID"))
+	BotOperatorRoleID = os.Getenv("BOTOPERATORROLEID")
+	TwitterEmoji = fmt.Sprintf("%s:%s", os.Getenv("TWITTEREMOJINAME"), os.Getenv("TWITTEREMOJIID"))
+	TwitterEmojiName = os.Getenv("TWITTEREMOJINAME")
 	return nil
 }
