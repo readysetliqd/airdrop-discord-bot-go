@@ -2,11 +2,7 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
-
-	"github.com/joho/godotenv"
-	"github.com/readysetliqd/airdrop-discord-bot-go/data"
 )
 
 var (
@@ -26,10 +22,6 @@ var (
 
 // ReadConfig reads the environment variables and assigns them into global exported variables
 func ReadConfig() error {
-	err := godotenv.Load(data.ConfigEnvFileName)
-	if err != nil {
-		log.Fatal("error loading .env files |", err)
-	}
 	Token = os.Getenv("TOKEN")
 	BotPrefix = os.Getenv("BOTPREFIX")
 	DefaultChannelID = os.Getenv("GUILDID")
