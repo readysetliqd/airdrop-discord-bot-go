@@ -2,7 +2,10 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 var (
@@ -22,6 +25,10 @@ var (
 
 // ReadConfig reads the environment variables and assigns them into global exported variables
 func ReadConfig() error {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("loading .env | ", err)
+	}
 	Token = os.Getenv("TOKEN")
 	BotPrefix = os.Getenv("BOTPREFIX")
 	DefaultChannelID = os.Getenv("GUILDID")
