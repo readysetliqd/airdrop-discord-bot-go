@@ -108,13 +108,13 @@ func Start() error {
 
 	s, err = discordgo.New("Bot " + config.Token)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating new bot | %w", err)
 	}
+	log.Println("New session created.")
 
 	u, err := s.User("@me")
-
 	if err != nil {
-		return err
+		return fmt.Errorf("getting user details @me | %w", err)
 	}
 
 	BotId = u.ID
@@ -146,7 +146,7 @@ func Start() error {
 		return err
 	}
 
-	fmt.Println("Bot is running!")
+	log.Println("Bot is running!")
 
 	// start ticker for daily queries to cryptorank
 	tickerDelay := 24 * time.Hour
