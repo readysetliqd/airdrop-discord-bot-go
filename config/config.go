@@ -31,8 +31,8 @@ func ReadConfig() error {
 	}
 	Token = os.Getenv("TOKEN")
 	BotPrefix = os.Getenv("BOTPREFIX")
-	DefaultChannelID = os.Getenv("GUILDID")
-	GuildID = os.Getenv("CHANNELID")
+	DefaultChannelID = os.Getenv("CHANNELID")
+	GuildID = os.Getenv("GUILDID")
 	FundingRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("FUNDINGROUNDROLEID"))
 	EarlyRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("EARLYROUNDROLEID"))
 	BinanceRoundRoleID = fmt.Sprintf("<@&%s>", os.Getenv("BINANCEROUNDROLEID"))
