@@ -118,7 +118,7 @@ var (
 		"ping": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			content := "Pong!"
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponsePong,
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
 					Content: content,
 				},
