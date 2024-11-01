@@ -31,6 +31,18 @@ var unprocessedMessages *data.UnprocessedMessages
 var protocols *data.Protocols
 var s *discordgo.Session
 
+// tickerDelay is the delay for how often the main loop fires that queries
+// cryptorank and posts results to the discord channel
+const tickerDelay = 24 * time.Hour
+
+var ticker = time.NewTicker(tickerDelay)
+var shutdownSignals = make(chan os.Signal, 1)
+
+func init() {
+	signal.Notify(shutdownSignals, syscall.SIGINT, syscall.SIGTERM)
+}
+
+// initialize and add logic for slash commands
 var (
 	commands = []*discordgo.ApplicationCommand{
 		{
@@ -46,9 +58,16 @@ var (
 					Name:        "protocol",
 					Description: "Name of protocol, case and other character sensitive",
 					Required:    true,
-					//TODO after main.go bot logic is moved here, add choices from list of protocols on loading
 				},
 			},
+		},
+		{
+			Name:        "ping",
+			Description: "Sends ping to discord bot. Should respond \"Pong!\" if bot is running.",
+		},
+		{
+			Name:        "force-query-and-reset-timer",
+			Description: "Forces a query to crypto rank immediately and resets the 24 hour timer to fire at current time.",
 		},
 	}
 
@@ -90,7 +109,26 @@ var (
 			}
 
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				// Ignore type for now, they will be discussed in "responses"
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: content,
+				},
+			})
+		},
+		"ping": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			content := "Pong!"
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponsePong,
+				Data: &discordgo.InteractionResponseData{
+					Content: content,
+				},
+			})
+		},
+		"force-query-and-reset-timer": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			content := fmt.Sprintf("Forcing query now. Restarting timer to fire every day at %s", time.Now().Format(time.Kitchen))
+			queryCryptoRankAndSendEmbeds()
+			ticker.Reset(tickerDelay)
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
 					Content: content,
@@ -101,25 +139,58 @@ var (
 )
 
 func Start() error {
-	// load files into maps and pass up to global scope
+	// load backup files for stored protocols and unprocessed message into maps
+	// and pass up to global scope
 	protocols = loadProtocols()
 	unprocessedMessages = loadUnprocessedMessages()
 	var err error
 
+	// create new discord session and assign it up to global variable s
 	s, err = discordgo.New("Bot " + config.Token)
 	if err != nil {
 		return fmt.Errorf("creating new bot | %w", err)
 	}
 	log.Println("New session created.")
 
+	// get user details of the bot and assign its ID to global variable BotId
 	u, err := s.User("@me")
 	if err != nil {
 		return fmt.Errorf("getting user details @me | %w", err)
 	}
-
 	BotId = u.ID
 
-	s.AddHandler(messageHandler)
+	// add handlers for all events and interactions
+	addEventHandlers()
+
+	// open the websocket to discord for this session
+	err = s.Open()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// register all the global commands to this guild and store them in a list
+	// for removal on shutdown
+	registeredCommands := addCommands()
+
+	log.Println("Bot is running!")
+
+	// main go routine loop to query cryptorank, send messages to discord, and add new rounds to rounds file
+	go func() {
+		for range ticker.C {
+			queryCryptoRankAndSendEmbeds()
+		}
+	}()
+
+	// block until graceful shutdown
+	<-shutdownSignals
+	log.Println("shutdown signal received")
+	gracefulShutdown(registeredCommands)
+	return nil
+}
+
+// addEventHandlers adds all event handlers to the current session ie. reactions,
+// messages, interactions etc.
+func addEventHandlers() {
 	s.AddHandler(reactionHandler)
 	s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
@@ -129,56 +200,26 @@ func Start() error {
 	s.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
 		log.Printf("Logged in as: %v#%v", s.State.User.Username, s.State.User.Discriminator)
 	})
+}
 
-	err = s.Open()
-
-	log.Println("Adding commands...")
-	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
-	for i, v := range commands {
-		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, config.GuildID, v)
-		if err != nil {
-			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
-		}
-		registeredCommands[i] = cmd
-	}
-
+// queryCryptoRankAndSendEmbeds is a helper function that calls the functions
+// to query crypto rank for the previous day and sends the embeds to the discord
+// channel of the results. This function is intended to contain all logic for the
+// main daily loop of the bot
+func queryCryptoRankAndSendEmbeds() {
+	start := time.Now().Add(time.Hour * -24).Format("2006-01-02")
+	//TODO add err to this function
+	respDataStructs := queryCryptoRank(start)
+	err := sendFundingRoundsRecapEmbed(respDataStructs, start)
 	if err != nil {
-		return err
+		log.Println(err)
+		shutdownSignals <- syscall.SIGTERM
 	}
-
-	log.Println("Bot is running!")
-
-	// start ticker for daily queries to cryptorank
-	tickerDelay := 24 * time.Hour
-	ticker := time.NewTicker(tickerDelay)
-	shutdownSignals := make(chan os.Signal, 1)
-	signal.Notify(shutdownSignals, syscall.SIGINT, syscall.SIGTERM)
-
-	// main go routine loop to query cryptorank, send messages to discord, and add new rounds to rounds file
-	go func() {
-		for range ticker.C {
-			start := time.Now().Add(time.Hour * -24).Format("2006-01-02")
-			//TODO add err to this function
-			respDataStructs := queryCryptoRank(start)
-			err = sendFundingRoundsRecapEmbed(respDataStructs, start)
-			if err != nil {
-				log.Println(err)
-				shutdownSignals <- syscall.SIGTERM
-			}
-			//TODO add err to this function
-			rounds := sendIndividualFundingRoundsEmbeds(respDataStructs)
-			if len(rounds) > 0 {
-				AppendToFile(data.RoundsFileName, rounds)
-			}
-		}
-	}()
-
-	// block until graceful shutdown
-	<-shutdownSignals
-	log.Println("shutdown signal received")
-	gracefulShutdown()
-	// TODO after moving main.go bot running logic here, add logic to remove registered commands on graceful shotdown
-	return nil
+	//TODO add err to this function
+	rounds := sendIndividualFundingRoundsEmbeds(respDataStructs)
+	if len(rounds) > 0 {
+		AppendToFile(data.RoundsFileName, rounds)
+	}
 }
 
 func reactionHandler(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
@@ -290,20 +331,6 @@ func reactionHandler(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 				}
 			}
 		}
-	}
-}
-
-func messageHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.ID == BotId {
-		return
-	}
-
-	// if m.content contains botid (Mentions) and "ping" then send "pong!"
-	switch {
-	case m.Content == "<@"+BotId+"> ping":
-		_, _ = s.ChannelMessageSend(m.ChannelID, m.Content)
-	case m.Content == config.BotPrefix+"ping":
-		_, _ = s.ChannelMessageSend(m.ChannelID, "pong!")
 	}
 }
 
@@ -574,8 +601,9 @@ func queryCryptoRank(start string) *[]data.RespData {
 // has been changed or a key deleted) or appended (no fields changed only new
 // key added). If it has been modified it overwrites the file, if it has been
 // appended it appends only the new data to the file. Otherwise it leaves the
-// file alone. It logs any errors encountered.
-func gracefulShutdown() {
+// file alone. It logs any errors encountered. It also removes commands from
+// the current session's guild that were added on startup.
+func gracefulShutdown(registeredCommands *[]*discordgo.ApplicationCommand) {
 	// backup unprocessed messages
 	if unprocessedMessages.IsModified() {
 		err := OverwriteFile(data.UnprocessedMessagesFileName, unprocessedMessages.M)
@@ -615,6 +643,35 @@ func gracefulShutdown() {
 			log.Printf("appending to file %s | %v\n", data.ProtocolsFileName, err)
 		}
 	}
+
+	removeCommands(registeredCommands)
+}
+
+// removeCommands is a helper function to remove all registered commands from
+// the guild that were added in this current session. Intended to be called on shutdown
+func removeCommands(registeredCommands *[]*discordgo.ApplicationCommand) {
+	log.Println("Removing commands...")
+	for _, v := range *registeredCommands {
+		err := s.ApplicationCommandDelete(s.State.User.ID, config.GuildID, v.ID)
+		if err != nil {
+			log.Panicf("Cannot delete '%v' command: %v", v.Name, err)
+		}
+	}
+}
+
+// addCommands is a helper function to add commands to the current session from
+// global variable commands
+func addCommands() *[]*discordgo.ApplicationCommand {
+	log.Println("Adding commands...")
+	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
+	for i, v := range commands {
+		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, config.GuildID, v)
+		if err != nil {
+			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
+		}
+		registeredCommands[i] = cmd
+	}
+	return &registeredCommands
 }
 
 // AppendToFile makes a number of attempts to call tryAppendFile. If it succeeds
