@@ -434,7 +434,15 @@ func sendIndividualFundingRoundsEmbeds(respDataStructs *[]data.RespData) map[str
 		tier1Joined := strings.Join(tier1, ", ")
 		tier2Joined := strings.Join(tier2, ", ")
 		raise := raiseToString(entry.Raise)
-		totalRaise := raiseToString(entry.TotalRaise)
+		var totalRaise string
+		switch v := entry.TotalRaise.(type) {
+		case int:
+			totalRaise = raiseToString(v)
+		case float64:
+			totalRaise = raiseToString(int(v))
+		default:
+			panic(fmt.Sprintf("totalRaise type unknown: %T | %v", v, v))
+		}
 		newEmbed := &discordgo.MessageEmbed{
 			Title:       entry.Name,
 			Description: desc,

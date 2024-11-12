@@ -78,7 +78,7 @@ type RespData struct {
 	Date             time.Time `json:"date"`
 	Raise            int       `json:"raise"`
 	PublicSalesRaise any       `json:"publicSalesRaise"`
-	TotalRaise       int       `json:"totalRaise"`
+	TotalRaise       any       `json:"totalRaise"`
 	Stage            string    `json:"stage"`
 	Status           string    `json:"status"`
 	Country          any       `json:"country"`
