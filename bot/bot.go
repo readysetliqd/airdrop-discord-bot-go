@@ -582,7 +582,7 @@ func queryCryptoRank(start string) *[]data.RespData {
 	var resp data.Resp
 	err = json.Unmarshal(msg, &resp)
 	if err != nil {
-		panic(data.JsonMarshalError{OriginalErr: err})
+		panic(data.JsonMarshalError{OriginalErr: err, Data: msg})
 	}
 	err = res.Body.Close()
 	if err != nil {

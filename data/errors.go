@@ -18,6 +18,7 @@ func IsTemporary(err error) bool {
 
 type JsonMarshalError struct {
 	OriginalErr error
+	Data        []byte
 }
 
 func (e JsonMarshalError) Error() string {
