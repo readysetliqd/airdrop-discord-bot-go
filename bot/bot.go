@@ -208,11 +208,15 @@ func addEventHandlers() {
 // main daily loop of the bot
 func queryCryptoRankAndSendEmbeds() {
 	start := time.Now().Add(time.Hour * -24).Format("2006-01-02")
-	//TODO add err to this function
-	respDataStructs := queryCryptoRank(start)
-	err := sendFundingRoundsRecapEmbed(respDataStructs, start)
+	var err error
+	respDataStructs, err := queryCryptoRank(start)
 	if err != nil {
-		log.Println(err)
+		log.Println("querying cryptorank |", err)
+		shutdownSignals <- syscall.SIGTERM
+	}
+	err = sendFundingRoundsRecapEmbed(respDataStructs, start)
+	if err != nil {
+		log.Println("sending funding rounds recap embed to discord |", err)
 		shutdownSignals <- syscall.SIGTERM
 	}
 	//TODO add err to this function
@@ -440,6 +444,8 @@ func sendIndividualFundingRoundsEmbeds(respDataStructs *[]data.RespData) map[str
 			totalRaise = raiseToString(v)
 		case float64:
 			totalRaise = raiseToString(int(v))
+		case nil:
+			totalRaise = "N/A"
 		default:
 			panic(fmt.Sprintf("totalRaise type unknown: %T | %v", v, v))
 		}
@@ -568,40 +574,40 @@ func sendFundingRoundsRecapEmbed(respDataStructs *[]data.RespData, start string)
 }
 
 // queryCryptoRank sends an http POST request to cryptorank's API for the previous day's funding rounds
-func queryCryptoRank(start string) *[]data.RespData {
+func queryCryptoRank(start string) (*[]data.RespData, error) {
 	// query the cryptorank.io api for funding rounds within one day
 	end := time.Now().Format("2006-01-02")
 	body := []byte(`{"limit":20,"filters":{"date":{"start":"` + start + `","end":"` + end + `"}},"skip":0,"sortingColumn":"date","sortingDirection":"DESC"}`)
-	//TODO error handling throughout; do something besides panic
 	r, err := http.NewRequest("POST", data.PostURL, bytes.NewBuffer(body))
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("creating http request | %w", err)
 	}
 	r.Header.Add("Content-Type", "application/json")
 	client := &http.Client{}
 	res, err := client.Do(r)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("sending http request | %w", err)
 	}
 	msg, err := io.ReadAll(res.Body)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("reading body | %w", err)
 	}
 	var resp data.Resp
 	err = json.Unmarshal(msg, &resp)
 	if err != nil {
-		panic(data.JsonMarshalError{OriginalErr: err, Data: msg})
+		//TODO is this wrapping right? i think no
+		return nil, fmt.Errorf("unmarshalling json | %w", data.JsonMarshalError{OriginalErr: err, Data: msg})
 	}
 	err = res.Body.Close()
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("closing body | %w", err)
 	}
 	respDataStructs := resp.Data
 	sort.Slice(respDataStructs, func(i, j int) bool {
 		return respDataStructs[i].Raise > respDataStructs[j].Raise
 	})
 
-	return &respDataStructs
+	return &respDataStructs, nil
 }
 
 // gracefulShutdown backs up both jsonl files for protocols and unprocessed
